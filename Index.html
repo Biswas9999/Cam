@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Scanner — Clothing Store</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0b1020; color: #e8ecff; min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, #6d5dfc, #8b7bff);
+    padding: 14px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 50;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 700; }
+  header p { font-size: .72rem; opacity: .9; margin-top: 2px; }
+  .logout-btn {
+    background: rgba(255,255,255,.22); color: #fff;
+    border: none; padding: 8px 14px; border-radius: 8px;
+    font-size: .82rem; cursor: pointer; font-weight: 600;
+  }
+
+  main { padding: 14px; max-width: 600px; margin: 0 auto; }
+  .card {
+    background: #1a2140; border: 1px solid #2e3766;
+    border-radius: 14px; padding: 16px; margin-bottom: 14px;
+  }
+
+  #reader { width: 100%; border-radius: 14px; overflow: hidden; background: #000; min-height: 280px; }
+  #reader video { width: 100% !important; height: auto !important; }
+  #reader img { display: none !important; }
+
+  .status-line {
+    font-size: .82rem; margin-top: 10px; color: #8f98c2;
+    text-align: center; padding: 8px; border-radius: 8px;
+  }
+  .status-line.ok { color: #86efac; background: rgba(34,197,94,.1); }
+  .status-line.err { color: #fca5a5; background: rgba(239,68,68,.1); }
+  .status-line.busy { color: #fcd34d; background: rgba(245,158,11,.1); }
+
+  input, button { font-family: inherit; font-size: 1rem; }
+  input {
+    width: 100%; padding: 12px 14px; background: #0b1020; color: #e8ecff;
+    border: 1px solid #2e3766; border-radius: 10px; outline: none;
+  }
+  input:focus { border-color: #6d5dfc; }
+
+  button.btn {
+    width: 100%; padding: 13px; border: none; border-radius: 10px;
+    font-weight: 700; cursor: pointer;
+  }
+  button.btn.primary { background: linear-gradient(135deg, #6d5dfc, #8b7bff); color: #fff; }
+  button.btn.success { background: linear-gradient(135deg, #16a34a, #22c55e); color: #fff; }
+  button.btn.danger { background: linear-gradient(135deg, #b91c1c, #ef4444); color: #fff; }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-row > button { flex: 1; }
+
+  #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  #loginScreen .card { max-width: 360px; width: 100%; text-align: center; }
+  #appScreen { display: none; }
+
+  .recent-scans {
+    max-height: 250px; overflow-y: auto;
+    margin-top: 8px;
+  }
+  .recent-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid #2e3766;
+    font-size: .82rem;
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: none; }
+  }
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item .icon { font-size: 1.1rem; }
+  .recent-item .info { flex: 1; min-width: 0; }
+  .recent-item .name { font-weight: 600; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent-item .meta { font-size: .7rem; color: #8f98c2; margin-top: 2px; }
+  .recent-item .check { color: #22c55e; font-weight: 700; font-size: 1rem; }
+  .recent-item .err { color: #ef4444; font-size: 1rem; }
+
+  .empty { text-align: center; color: #8f98c2; font-size: .82rem; padding: 20px; }
+
+  .counter-pill {
+    display: inline-block; background: rgba(34,197,94,.15);
+    color: #86efac; padding: 3px 10px; border-radius: 20px;
+    font-size: .75rem; font-weight: 700; margin-left: 6px;
+  }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1a2140; color: #fff; padding: 12px 18px; border-radius: 10px;
+    z-index: 200; opacity: 0; transition: opacity .3s; font-size: .9rem;
+    max-width: 90vw; text-align: center; border: 1px solid #2e3766;
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { background: #991b1b; border-color: #ef4444; }
+  .toast.success { background: #065f46; border-color: #22c55e; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="card">
+    <h2 style="margin-bottom:10px;">📷 Scanner Login</h2>
+    <p style="font-size:.82rem;color:#8f98c2;margin-bottom:14px;">Enter scanner password</p>
+    <input id="scanPassword" type="password" inputmode="numeric" placeholder="••••"
+           style="text-align:center;letter-spacing:6px;font-size:1.3rem;padding:14px;" />
+    <button class="btn primary" style="margin-top:12px;" id="loginBtn">Unlock</button>
+    <p id="loginError" style="color:#fca5a5;font-size:.85rem;margin-top:10px;"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen">
+  <header>
+    <div>
+      <h1>📷 Scanner Panel</h1>
+      <p id="connStatus">Connecting…</p>
+    </div>
+    <button class="logout-btn" id="logoutBtn">Lock</button>
+  </header>
+
+  <main>
+    <!-- CAMERA -->
+    <div class="card">
+      <div id="reader"></div>
+      <div class="status-line" id="camStatus">Camera idle — tap Start</div>
+      <div class="btn-row">
+        <button class="btn success" id="startBtn">▶ Start Camera</button>
+        <button class="btn danger" id="stopBtn" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <!-- MANUAL SKU -->
+    <div class="card">
+      <label style="font-size:.78rem;color:#8f98c2;display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;">
+        Manual SKU Entry
+      </label>
+      <input id="manualSku" placeholder="Enter SKU and press Send" />
+      <button class="btn primary" style="margin-top:10px;" id="manualBtn">Send by SKU</button>
+    </div>
+
+    <!-- RECENT SCANS -->
+    <div class="card">
+      <h3 style="font-size:.9rem;margin-bottom:10px;">
+        Recent Scans <span class="counter-pill" id="scanCount">0</span>
+      </h3>
+      <p style="font-size:.72rem;color:#8f98c2;margin-bottom:10px;">
+        ✅ = Store Panel-এ পাঠানো হয়েছে (ডিটেইলস ওখানে দেখাবে)
+      </p>
+      <div class="recent-scans" id="recentScans">
+        <div class="empty">এখনো কোনো স্ক্যান হয়নি</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyBI-EF6kqrTXqSgQuQJ3hOROUu5H_CQ5Mo",
+    authDomain: "free-fire-f3916.firebaseapp.com",
+    databaseURL: "https://free-fire-f3916-default-rtdb.firebaseio.com",
+    projectId: "free-fire-f3916",
+    storageBucket: "free-fire-f3916.firebasestorage.app",
+    messagingSenderId: "90678606386",
+    appId: "1:90678606386:web:bcc4861465611a3bf49a2b",
+    measurementId: "G-XGYV26VM02"
+  };
+
+  var SCANNER_PASSWORD = "1234";
+  var SESSION_KEY = "scanner_session_v3";
+  var SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+
+  var db = null;
+  var qrScanner = null;
+  var cameraRunning = false;
+  var lastScanPayload = "";
+  var lastScanTime = 0;
+  var SCAN_COOLDOWN_MS = 2000;
+  var recentScans = [];
+  var scanCount = 0;
+  var qrLibLoaded = false;
+  var qrLibLoading = null;
+
+  var DEVICE_ID = localStorage.getItem("scanner_device_id");
+  if (!DEVICE_ID) {
+    DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem("scanner_device_id", DEVICE_ID);
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function toast(msg, type) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.className = "toast show " + (type || "");
+    clearTimeout(t._t);
+    t._t = setTimeout(function () { t.className = "toast " + (type || ""); }, 3000);
+  }
+  function fmtTime(ts) {
+    if (!ts) return "";
+    var d = ts.toDate ? ts.toDate() : new Date(ts);
+    return isNaN(d.getTime()) ? "" : d.toLocaleTimeString();
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[c];
+    });
+  }
+
+  function checkSession() {
+    try {
+      var raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return false;
+      var s = JSON.parse(raw);
+      if (Date.now() - s.ts > SESSION_TTL_MS) { localStorage.removeItem(SESSION_KEY); return false; }
+      return true;
+    } catch (e) { return false; }
+  }
+  function doLogin() {
+    $("loginError").textContent = "";
+    var pw = $("scanPassword").value;
+    if (!pw) { $("loginError").textContent = "Enter password."; return; }
+    if (pw !== SCANNER_PASSWORD) {
+      $("loginError").textContent = "Wrong password.";
+      $("scanPassword").value = "";
+      return;
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
+    $("scanPassword").value = "";
+    showApp();
+  }
+  function doLogout() {
+    if (!confirm("Lock scanner?")) return;
+    stopCamera();
+    localStorage.removeItem(SESSION_KEY);
+    $("appScreen").style.display = "none";
+    $("loginScreen").style.display = "flex";
+  }
+
+  // FIREBASE
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src; s.async = true;
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error("Failed: " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  async function loadFirebase() {
+    if (window.firebase && window.firebase.firestore) { db = window.firebase.firestore(); return; }
+    await loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js");
+    if (!window.firebase.apps.length) window.firebase.initializeApp(firebaseConfig);
+    db = window.firebase.firestore();
+  }
+
+  // QR SCANNER LIBRARY
+  function loadQRScannerLib() {
+    if (qrLibLoaded && window.Html5Qrcode) return Promise.resolve();
+    if (qrLibLoading) return qrLibLoading;
+    var CDNS = [
+      "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js",
+      "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"
+    ];
+    qrLibLoading = (async function () {
+      for (var i = 0; i < CDNS.length; i++) {
+        try {
+          await loadScript(CDNS[i]);
+          if (window.Html5Qrcode) { qrLibLoaded = true; return true; }
+        } catch (e) { console.warn("Scanner CDN failed:", CDNS[i]); }
+      }
+      qrLibLoading = null;
+      throw new Error("QR scanner library load করা যায়নি। ইন্টারনেট চেক করুন।");
+    })();
+    return qrLibLoading;
+  }
+
+  // BOOT
+  async function showApp() {
+    $("loginScreen").style.display = "none";
+    $("appScreen").style.display = "block";
+    loadQRScannerLib().catch(function () {});
+    try {
+      await loadFirebase();
+      $("connStatus").textContent = "🟢 Firebase Online";
+    } catch (e) {
+      $("connStatus").textContent = "🔴 Firebase Offline";
+      toast("Firebase failed: " + e.message, "error");
+    }
+  }
+
+  // CAMERA
+  async function startCamera() {
+    if (cameraRunning) return;
+    if (!window.isSecureContext) {
+      $("camStatus").textContent = "⚠️ HTTPS বা localhost প্রয়োজন";
+      $("camStatus").className = "status-line err";
+      return;
+    }
+    $("startBtn").disabled = true;
+    $("camStatus").textContent = "Scanner লোড হচ্ছে…";
+    $("camStatus").className = "status-line busy";
+    try {
+      await loadQRScannerLib();
+    } catch (e) {
+      $("camStatus").textContent = "⚠️ " + e.message;
+      $("camStatus").className = "status-line err";
+      $("startBtn").disabled = false;
+      return;
+    }
+    try {
+      if (!qrScanner) qrScanner = new Html5Qrcode("reader");
+      await qrScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 260 } },
+        function (decodedText) { onScan(decodedText); },
+        function () {}
+      );
+      cameraRunning = true;
+      $("stopBtn").disabled = false;
+      $("startBtn").disabled = true;
+      $("camStatus").textContent = "🟢 ক্যামেরা চালু — QR স্ক্যান করুন";
+      $("camStatus").className = "status-line ok";
+    } catch (e) {
+      $("startBtn").disabled = false;
+      var msg = String(e.message || e);
+      if (msg.indexOf("NotAllowed") >= 0 || msg.indexOf("Permission") >= 0) {
+        $("camStatus").textContent = "⚠️ ক্যামেরা অনুমতি দিন";
+      } else if (msg.indexOf("NotFound") >= 0) {
+        $("camStatus").textContent = "⚠️ ক্যামেরা পাওয়া যায়নি";
+      } else {
+        $("camStatus").textContent = "⚠️ " + msg;
+      }
+      $("camStatus").className = "status-line err";
+    }
+  }
+  async function stopCamera() {
+    if (!qrScanner || !cameraRunning) return;
+    try { await qrScanner.stop(); } catch (e) {}
+    try { qrScanner.clear(); } catch (e) {}
+    cameraRunning = false;
+    $("startBtn").disabled = false;
+    $("stopBtn").disabled = true;
+    $("camStatus").textContent = "ক্যামেরা বন্ধ";
+    $("camStatus").className = "status-line";
+  }
+
+  // SCAN HANDLER
+  async function onScan(payload) {
+    var now = Date.now();
+    if (payload === lastScanPayload && now - lastScanTime < SCAN_COOLDOWN_MS) return;
+    lastScanPayload = payload;
+    lastScanTime = now;
+    await processPayload(payload);
+  }
+
+  async function processPayload(payload) {
+    var parsed;
+    try { parsed = JSON.parse(payload); }
+    catch (e) {
+      addRecent(null, "Invalid QR", "error");
+      toast("❌ ভুল QR ফরম্যাট", "error");
+      return;
+    }
+    if (parsed.v !== 1 || (!parsed.pid && !parsed.sku)) {
+      addRecent(null, "Unknown QR", "error");
+      toast("❌ অজানা QR", "error");
+      return;
+    }
+
+    // Verify product exists
+    var product = null;
+    try {
+      if (parsed.pid) {
+        var snap = await db.collection("products").doc(parsed.pid).get();
+        if (snap.exists) {
+          product = snap.data();
+          product.id = snap.id;
+        }
+      }
+      if (!product && parsed.sku) {
+        var q = await db.collection("products").where("sku", "==", parsed.sku).limit(1).get();
+        if (!q.empty) {
+          product = q.docs[0].data();
+          product.id = q.docs[0].id;
+        }
+      }
+    } catch (e) {
+      addRecent(null, "Firebase error", "error");
+      toast("❌ Firebase: " + e.message, "error");
+      return;
+    }
+
+    if (!product) {
+      addRecent({ name: parsed.sku || "Unknown", sku: parsed.sku || "" }, "Product not found", "error");
+      toast("❌ প্রোডাক্ট পাওয়া যায়নি", "error");
+      return;
+    }
+    if (product.status !== "active") {
+      addRecent(product, "Inactive product", "error");
+      toast("❌ প্রোডাক্ট নিষ্ক্রিয়", "error");
+      return;
+    }
+
+    // Send scan event to Firestore
+    try {
+      await db.collection("scanEvents").add({
+        eventId: "ev-" + Math.random().toString(36).slice(2, 12),
+        productId: product.id,
+        sku: product.sku,
+        productName: product.name,
+        price: Number(product.sellingPrice || 0),
+        imageUrl: product.imageUrl || "",
+        size: product.size || "",
+        color: product.color || "",
+        deviceId: DEVICE_ID,
+        scannerEmail: "scanner@" + DEVICE_ID,
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+        status: "pending"
+      });
+      addRecent(product, "Sent to Store", "success");
+      toast("✅ " + product.name + " — Store Panel-এ পাঠানো হয়েছে", "success");
+      if (navigator.vibrate) navigator.vibrate(80);
+    } catch (e) {
+      addRecent(product, "Send failed", "error");
+      toast("❌ পাঠানো যায়নি: " + e.message, "error");
+    }
+  }
+
+  function addRecent(product, note, status) {
+    scanCount++;
+    $("scanCount").textContent = scanCount;
+    recentScans.unshift({
+      product: product,
+      note: note,
+      status: status,
+      time: new Date()
+    });
+    if (recentScans.length > 20) recentScans.pop();
+    renderRecent();
+  }
+
+  function renderRecent() {
+    var el = $("recentScans");
+    if (!recentScans.length) {
+      el.innerHTML = "<div class='empty'>এখনো কোনো স্ক্যান হয়নি</div>";
+      return;
+    }
+    var html = "";
+    recentScans.forEach(function (s) {
+      var icon = s.status === "success" ? "✅" : "❌";
+      var cls = s.status === "success" ? "check" : "err";
+      var name = s.product ? esc(s.product.name) : s.note;
+      var sku = s.product && s.product.sku ? esc(s.product.sku) : "";
+      html += "<div class='recent-item'>" +
+        "<span class='icon " + cls + "'>" + icon + "</span>" +
+        "<div class='info'>" +
+          "<div class='name'>" + name + "</div>" +
+          "<div class='meta'>" + sku + (sku ? " • " : "") + s.time.toLocaleTimeString() + "</div>" +
+        "</div>" +
+      "</div>";
+    });
+    el.innerHTML = html;
+  }
+
+  async function manualAdd() {
+    var sku = $("manualSku").value.trim();
+    if (!sku) { toast("SKU লিখুন", "error"); return; }
+    await processPayload(JSON.stringify({ v: 1, sku: sku }));
+    $("manualSku").value = "";
+  }
+
+  // WIRE
+  function wire() {
+    $("loginBtn").addEventListener("click", doLogin);
+    $("scanPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doLogin(); });
+    $("logoutBtn").addEventListener("click", doLogout);
+    $("startBtn").addEventListener("click", startCamera);
+    $("stopBtn").addEventListener("click", stopCamera);
+    $("manualBtn").addEventListener("click", manualAdd);
+    $("manualSku").addEventListener("keydown", function (e) { if (e.key === "Enter") manualAdd(); });
+  }
+
+  function init() {
+    wire();
+    if (checkSession()) showApp();
+    else {
+      $("loginScreen").style.display = "flex";
+      $("appScreen").style.display = "none";
+    }
+  }
+
+  window.addEventListener("beforeunload", stopCamera);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+</body>
+</html>
